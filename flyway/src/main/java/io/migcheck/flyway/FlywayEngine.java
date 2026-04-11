@@ -27,9 +27,17 @@ public class FlywayEngine implements MigrationEngine {
 
     @Override
     public void rollback(DataSource dataSource, String rollbackSql) {
-        try (Connection conn = dataSource.getConnection();
-             Statement st = conn.createStatement()) {
-            st.execute(rollbackSql);
+        try (Connection conn = dataSource.getConnection()) {
+            conn.setAutoCommit(false);
+            try (Statement st = conn.createStatement()) {
+                st.execute(rollbackSql);
+                st.execute("DELETE FROM flyway_schema_history WHERE installed_rank = "
+                        + "(SELECT MAX(installed_rank) FROM flyway_schema_history)");
+                conn.commit();
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to execute rollback SQL", e);
         }

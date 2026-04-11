@@ -10,20 +10,30 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class SnapshotEngine {
 
     private final Dialect dialect;
     private final String schema;
+    private final Set<String> ignoredTables;
 
     public SnapshotEngine(Dialect dialect, String schema) {
+        this(dialect, schema, Set.of());
+    }
+
+    public SnapshotEngine(Dialect dialect, String schema, Set<String> ignoredTables) {
         this.dialect = dialect;
         this.schema = schema;
+        this.ignoredTables = ignoredTables;
     }
 
     public Snapshot capture(DataSource dataSource) {
         Map<String, TableSnapshot> tables = new LinkedHashMap<>();
         for (String table : dialect.tableNames(dataSource, schema)) {
+            if (ignoredTables.contains(table)) {
+                continue;
+            }
             tables.put(table, captureTable(dataSource, table));
         }
         return new Snapshot(tables);
