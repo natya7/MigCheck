@@ -1,0 +1,1 @@
+CREATE TABLE audit_log (id BIGINT PRIMARY KEY, message VARCHAR(255));
