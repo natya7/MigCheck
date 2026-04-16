@@ -28,11 +28,11 @@ public class MigrationTester {
         engine.clean(ds);
         engine.migrate(ds);
         execute(ds, scenario.seedSql());
-        Snapshot before = snapshots.capture(ds);
+        Snapshot before = snapshots.capture(ds, engine.metadataTables());
 
         engine.rollback(ds, scenario.rollbackSql());
         engine.migrate(ds);
-        Snapshot after = snapshots.capture(ds);
+        Snapshot after = snapshots.capture(ds, engine.metadataTables());
 
         SnapshotDiff diff = comparator.compare(before, after);
         DynamicOutcome outcome =

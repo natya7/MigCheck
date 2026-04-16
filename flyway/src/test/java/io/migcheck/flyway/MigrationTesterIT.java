@@ -12,7 +12,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import javax.sql.DataSource;
-import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,9 +20,7 @@ class MigrationTesterIT {
 
     private final DataSource ds = PostgresSupport.dataSource();
     private final MigrationTester tester =
-            new MigrationTester(
-                    new SnapshotEngine(new PostgresDialect(), "public",
-                            Set.of("flyway_schema_history")),
+            new MigrationTester(new SnapshotEngine(new PostgresDialect(), "public"),
                     new DataComparator());
 
     static Stream<MigrationScenario> scenarios() {

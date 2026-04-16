@@ -3,6 +3,8 @@ package io.migcheck.flyway;
 import io.migcheck.engine.MigrationEngine;
 import org.flywaydb.core.Flyway;
 
+import java.util.Set;
+
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -10,10 +12,17 @@ import java.sql.Statement;
 
 public class FlywayEngine implements MigrationEngine {
 
+    private static final String HISTORY_TABLE = "flyway_schema_history";
+
     private final String migrationsLocation;
 
     public FlywayEngine(String migrationsLocation) {
         this.migrationsLocation = migrationsLocation;
+    }
+
+    @Override
+    public Set<String> metadataTables() {
+        return Set.of(HISTORY_TABLE);
     }
 
     @Override
@@ -31,8 +40,8 @@ public class FlywayEngine implements MigrationEngine {
             conn.setAutoCommit(false);
             try (Statement st = conn.createStatement()) {
                 st.execute(rollbackSql);
-                st.execute("DELETE FROM flyway_schema_history WHERE installed_rank = "
-                        + "(SELECT MAX(installed_rank) FROM flyway_schema_history)");
+                st.execute("DELETE FROM " + HISTORY_TABLE + " WHERE installed_rank = "
+                        + "(SELECT MAX(installed_rank) FROM " + HISTORY_TABLE + ")");
                 conn.commit();
             } catch (SQLException e) {
                 conn.rollback();

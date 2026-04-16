@@ -16,19 +16,17 @@ public class SnapshotEngine {
 
     private final Dialect dialect;
     private final String schema;
-    private final Set<String> ignoredTables;
 
     public SnapshotEngine(Dialect dialect, String schema) {
-        this(dialect, schema, Set.of());
-    }
-
-    public SnapshotEngine(Dialect dialect, String schema, Set<String> ignoredTables) {
         this.dialect = dialect;
         this.schema = schema;
-        this.ignoredTables = ignoredTables;
     }
 
     public Snapshot capture(DataSource dataSource) {
+        return capture(dataSource, Set.of());
+    }
+
+    public Snapshot capture(DataSource dataSource, Set<String> ignoredTables) {
         Map<String, TableSnapshot> tables = new LinkedHashMap<>();
         for (String table : dialect.tableNames(dataSource, schema)) {
             if (ignoredTables.contains(table)) {
