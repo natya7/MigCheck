@@ -9,5 +9,11 @@ public interface Dialect {
 
     List<String> columnNames(DataSource dataSource, String schema, String table);
 
+    List<Column> columns(DataSource dataSource, String schema, String table);
+
+    List<String> primaryKeyColumns(DataSource dataSource, String schema, String table);
+
     List<ForeignKey> foreignKeys(DataSource dataSource, String schema);
+
+    Object sampleValue(String dataType, int seed);
 }
