@@ -4,6 +4,7 @@ import io.migcheck.compare.DataComparator;
 import io.migcheck.dialect.PostgresDialect;
 import io.migcheck.report.DynamicOutcome;
 import io.migcheck.report.SafetyReport;
+import io.migcheck.seed.AutoSeeder;
 import io.migcheck.snapshot.SnapshotEngine;
 import io.migcheck.tester.MigrationScenario;
 import io.migcheck.tester.MigrationTester;
@@ -21,7 +22,8 @@ class MigrationTesterIT {
     private final DataSource ds = PostgresSupport.dataSource();
     private final MigrationTester tester =
             new MigrationTester(new SnapshotEngine(new PostgresDialect(), "public"),
-                    new DataComparator());
+                    new DataComparator(),
+                    new AutoSeeder(new PostgresDialect(), "public", 3));
 
     static Stream<MigrationScenario> scenarios() {
         return Stream.of(
@@ -39,7 +41,12 @@ class MigrationTesterIT {
                         "classpath:scenarios/lossy_narrowing",
                         "INSERT INTO users (id, name) VALUES (1, 'Alexandria the Great')",
                         "ALTER TABLE users ALTER COLUMN name TYPE VARCHAR(10) USING LEFT(name, 10)",
-                        DynamicOutcome.DATA_LOST));
+                        DynamicOutcome.DATA_LOST),
+                new MigrationScenario("auto-seeded multi-table rename",
+                        "classpath:scenarios/auto_seed_fk_rename",
+                        null,
+                        "ALTER TABLE customers RENAME COLUMN name TO full_name",
+                        DynamicOutcome.PRESERVED));
     }
 
     @ParameterizedTest(name = "{0}")

@@ -2,6 +2,7 @@ package io.migcheck.junit;
 
 import io.migcheck.compare.DataComparator;
 import io.migcheck.dialect.PostgresDialect;
+import io.migcheck.seed.AutoSeeder;
 import io.migcheck.snapshot.SnapshotEngine;
 import io.migcheck.tester.MigrationTester;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
@@ -42,7 +43,8 @@ public class MigrationSafetyExtension implements BeforeAllCallback, ParameterRes
         }
         if (type == MigrationTester.class) {
             return new MigrationTester(new SnapshotEngine(new PostgresDialect(), "public"),
-                    new DataComparator());
+                    new DataComparator(),
+                    new AutoSeeder(new PostgresDialect(), "public", 3));
         }
         throw new ParameterResolutionException("Unsupported parameter type: " + type);
     }

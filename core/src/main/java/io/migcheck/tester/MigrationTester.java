@@ -6,6 +6,7 @@ import io.migcheck.engine.MigrationEngine;
 import io.migcheck.report.DynamicOutcome;
 import io.migcheck.report.DynamicResult;
 import io.migcheck.report.SafetyReport;
+import io.migcheck.seed.AutoSeeder;
 import io.migcheck.snapshot.Snapshot;
 import io.migcheck.snapshot.SnapshotEngine;
 
@@ -18,16 +19,18 @@ public class MigrationTester {
 
     private final SnapshotEngine snapshots;
     private final DataComparator comparator;
+    private final AutoSeeder seeder;
 
-    public MigrationTester(SnapshotEngine snapshots, DataComparator comparator) {
+    public MigrationTester(SnapshotEngine snapshots, DataComparator comparator, AutoSeeder seeder) {
         this.snapshots = snapshots;
         this.comparator = comparator;
+        this.seeder = seeder;
     }
 
     public SafetyReport run(MigrationEngine engine, DataSource ds, MigrationScenario scenario) {
         engine.clean(ds);
         engine.migrate(ds);
-        execute(ds, scenario.seedSql());
+        seed(ds, engine, scenario);
         Snapshot before = snapshots.capture(ds, engine.metadataTables());
 
         engine.rollback(ds, scenario.rollbackSql());
@@ -38,6 +41,14 @@ public class MigrationTester {
         DynamicOutcome outcome =
                 diff.hasDataLoss() ? DynamicOutcome.DATA_LOST : DynamicOutcome.PRESERVED;
         return new SafetyReport(scenario.name(), new DynamicResult(outcome, diff));
+    }
+
+    private void seed(DataSource ds, MigrationEngine engine, MigrationScenario scenario) {
+        if (scenario.seedSql() != null && !scenario.seedSql().isBlank()) {
+            execute(ds, scenario.seedSql());
+        } else {
+            seeder.seed(ds, engine.metadataTables());
+        }
     }
 
     private void execute(DataSource ds, String sql) {
