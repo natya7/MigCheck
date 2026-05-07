@@ -8,6 +8,8 @@ java {
 }
 
 dependencies {
+    implementation(libs.jsqlparser)
+
     testFixturesApi(platform(libs.testcontainers.bom))
     testFixturesApi(libs.testcontainers.postgresql)
     testFixturesApi(libs.postgresql)
