@@ -17,24 +17,70 @@ class MigrationSafetyPluginTest {
     File projectDir;
 
     @Test
-    void staticTaskReportsRiskAndFailsOnHigh() throws Exception {
+    void safeMigrationsPassTheBuild() throws Exception {
+        setUpProject();
+        write("migrations/V1__create_users.sql", "CREATE TABLE users (id BIGINT PRIMARY KEY)");
+
+        BuildResult result = runner("migrationSafetyStatic").build();
+
+        assertThat(result.getOutput()).contains("PASS").contains("V1__create_users.sql");
+    }
+
+    @Test
+    void dropTableFailsTheBuild() throws Exception {
+        setUpProject();
+        write("migrations/V1__create_users.sql", "CREATE TABLE users (id BIGINT PRIMARY KEY)");
+        write("migrations/V2__drop_users.sql", "DROP TABLE users");
+
+        BuildResult result = runner("migrationSafetyStatic").buildAndFail();
+
+        assertThat(result.getOutput()).contains("PASS").contains("V1__create_users.sql");
+        assertThat(result.getOutput()).contains("FAIL").contains("V2__drop_users.sql");
+    }
+
+    @Test
+    void typeChangeOnlyWarnsByDefault() throws Exception {
+        setUpProject();
+        write("migrations/V1__widen.sql", "ALTER TABLE users ALTER COLUMN name TYPE VARCHAR(10)");
+
+        BuildResult result = runner("migrationSafetyStatic").build();
+
+        assertThat(result.getOutput()).contains("WARNING").contains("V1__widen.sql");
+    }
+
+    @Test
+    void typeChangeFailsWithFailOnWarning() throws Exception {
+        setUpProject();
+        write("migrations/V1__widen.sql", "ALTER TABLE users ALTER COLUMN name TYPE VARCHAR(10)");
+
+        BuildResult result = runner("migrationSafetyStatic", "--fail-on-warning").buildAndFail();
+
+        assertThat(result.getOutput()).contains("WARNING").contains("V1__widen.sql");
+    }
+
+    @Test
+    void checkTaskRunsTheStaticAnalysis() throws Exception {
+        setUpProject();
+        write("migrations/V1__create_users.sql", "CREATE TABLE users (id BIGINT PRIMARY KEY)");
+
+        BuildResult result = runner("migrationSafetyCheck").build();
+
+        assertThat(result.getOutput()).contains("PASS").contains("V1__create_users.sql");
+    }
+
+    private void setUpProject() throws Exception {
         write("settings.gradle", "rootProject.name = 'sample'");
         write("build.gradle",
                 "plugins { id 'io.migcheck.migration-safety' }\n"
                         + "migrationSafety { migrationDir = 'migrations' }\n");
-        write("migrations/V1__create_users.sql", "CREATE TABLE users (id BIGINT PRIMARY KEY)");
-        write("migrations/V2__drop_users.sql", "DROP TABLE users");
+        write("gradle.properties", "org.gradle.jvmargs=-Xms32m -Xmx256m");
+    }
 
-        write("gradle.properties", "org.gradle.jvmargs=-Xms32m -Xmx128m");
-
-        BuildResult result = GradleRunner.create()
+    private GradleRunner runner(String... args) {
+        return GradleRunner.create()
                 .withProjectDir(projectDir)
                 .withPluginClasspath()
-                .withArguments("migrationSafetyStatic")
-                .buildAndFail();
-
-        assertThat(result.getOutput()).contains("PASS").contains("V1__create_users.sql");
-        assertThat(result.getOutput()).contains("FAIL").contains("V2__drop_users.sql");
+                .withArguments(args);
     }
 
     private void write(String relativePath, String content) throws Exception {

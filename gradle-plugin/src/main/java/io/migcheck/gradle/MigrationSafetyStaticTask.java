@@ -2,13 +2,14 @@ package io.migcheck.gradle;
 
 import io.migcheck.analysis.RiskLevel;
 import io.migcheck.analysis.StaticAnalyzer;
-import io.migcheck.analysis.StaticResult;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
 import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.Input;
+import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.TaskAction;
+import org.gradle.api.tasks.options.Option;
 
 import javax.inject.Inject;
 import java.io.File;
@@ -21,6 +22,11 @@ public abstract class MigrationSafetyStaticTask extends DefaultTask {
     @Input
     public abstract Property<String> getMigrationDir();
 
+    @Input
+    @Optional
+    @Option(option = "fail-on-warning", description = "Fail the build on WARNING (MEDIUM) findings too")
+    public abstract Property<Boolean> getFailOnWarning();
+
     @Inject
     protected abstract ProjectLayout getProjectLayout();
 
@@ -32,17 +38,21 @@ public abstract class MigrationSafetyStaticTask extends DefaultTask {
             throw new GradleException("Migration directory not found: " + dir);
         }
         Arrays.sort(files);
+        if (files.length == 0) {
+            getLogger().warn("No .sql migrations found in " + dir);
+        }
         StaticAnalyzer analyzer = new StaticAnalyzer();
-        boolean anyHigh = false;
+        boolean failOnWarning = getFailOnWarning().getOrElse(false);
+        boolean failed = false;
         for (File file : files) {
-            StaticResult result = analyzer.analyze(read(file));
-            getLogger().lifecycle(label(result.risk()) + "  " + file.getName());
-            if (result.risk() == RiskLevel.HIGH) {
-                anyHigh = true;
+            RiskLevel risk = analyzer.analyze(read(file)).risk();
+            getLogger().lifecycle(label(risk) + "  " + file.getName());
+            if (risk == RiskLevel.HIGH || (failOnWarning && risk == RiskLevel.MEDIUM)) {
+                failed = true;
             }
         }
-        if (anyHigh) {
-            throw new GradleException("Migration safety check failed: HIGH-risk migrations found");
+        if (failed) {
+            throw new GradleException("Migration safety check failed");
         }
     }
 

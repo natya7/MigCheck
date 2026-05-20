@@ -14,7 +14,9 @@ public class MigrationSafetyPlugin implements Plugin<Project> {
         TaskProvider<MigrationSafetyStaticTask> staticTask = project.getTasks()
                 .register("migrationSafetyStatic", MigrationSafetyStaticTask.class, task -> {
                     task.setGroup("verification");
+                    task.setDescription("Analyzes migration SQL for rollback-safety risks");
                     task.getMigrationDir().set(project.provider(extension::getMigrationDir));
+                    task.getFailOnWarning().convention(false);
                 });
 
         project.getTasks().register("migrationSafetyCheck", task -> {
