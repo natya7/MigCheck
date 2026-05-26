@@ -15,6 +15,7 @@ dependencies {
     testImplementation(libs.assertj.core)
     testImplementation(testFixtures(project(":core")))
     testImplementation(project(":flyway"))
+    testRuntimeOnly(libs.junit.launcher)
 }
 
 tasks.test { useJUnitPlatform() }

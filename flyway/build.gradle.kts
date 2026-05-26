@@ -15,6 +15,7 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj.core)
     testImplementation(testFixtures(project(":core")))
+    testRuntimeOnly(libs.junit.launcher)
 }
 
 tasks.test { useJUnitPlatform() }
