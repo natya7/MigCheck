@@ -7,6 +7,7 @@ import io.migcheck.dialect.ForeignKey;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -53,18 +54,27 @@ public class AutoSeeder {
                 fkTargets.put(fk.column(), fk.referencedTable());
             }
         }
+        String generatedPk = pkColumns.size() == 1 && isGenerated(columns, pkColumns.get(0))
+                ? pkColumns.get(0) : null;
         List<Object> insertedKeys = new ArrayList<>();
         for (int row = 0; row < rowsPerTable; row++) {
             Map<String, Object> values = new LinkedHashMap<>();
             for (Column column : columns) {
+                if (column.generated()) {
+                    continue;
+                }
                 values.put(column.name(), valueFor(column, row, fkTargets, primaryKeys));
             }
-            insertRow(dataSource, table, values);
+            Object generatedKey = insertRow(dataSource, table, values, generatedPk);
             if (pkColumns.size() == 1) {
-                insertedKeys.add(values.get(pkColumns.get(0)));
+                insertedKeys.add(generatedPk != null ? generatedKey : values.get(pkColumns.get(0)));
             }
         }
         primaryKeys.put(table, insertedKeys);
+    }
+
+    private boolean isGenerated(List<Column> columns, String name) {
+        return columns.stream().anyMatch(c -> c.name().equals(name) && c.generated());
     }
 
     private Object valueFor(Column column, int row, Map<String, String> fkTargets,
@@ -74,27 +84,47 @@ public class AutoSeeder {
             List<Object> parentKeys = primaryKeys.getOrDefault(referenced, List.of());
             return parentKeys.isEmpty() ? null : parentKeys.get(row % parentKeys.size());
         }
-        return dialect.sampleValue(column.dataType(), row + 1);
+        Object value = dialect.sampleValue(column.dataType(), row + 1);
+        if (value instanceof String s && column.maxLength() != null && s.length() > column.maxLength()) {
+            return s.substring(0, column.maxLength());
+        }
+        return value;
     }
 
-    private void insertRow(DataSource dataSource, String table, Map<String, Object> values) {
+    private Object insertRow(DataSource dataSource, String table, Map<String, Object> values,
+                             String generatedPk) {
+        String sql = buildInsert(table, values);
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = generatedPk != null
+                     ? conn.prepareStatement(sql, new String[]{generatedPk})
+                     : conn.prepareStatement(sql)) {
+            int index = 1;
+            for (Object value : values.values()) {
+                ps.setObject(index++, value);
+            }
+            ps.execute();
+            if (generatedPk == null) {
+                return null;
+            }
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                return keys.next() ? keys.getObject(1) : null;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to seed table " + table, e);
+        }
+    }
+
+    private String buildInsert(String table, Map<String, Object> values) {
+        if (values.isEmpty()) {
+            return "INSERT INTO \"" + schema + "\".\"" + table + "\" DEFAULT VALUES";
+        }
         String columnList = values.keySet().stream()
                 .map(name -> "\"" + name + "\"")
                 .collect(Collectors.joining(", "));
         String placeholders = values.values().stream()
                 .map(v -> "?")
                 .collect(Collectors.joining(", "));
-        String sql = "INSERT INTO \"" + schema + "\".\"" + table + "\" ("
+        return "INSERT INTO \"" + schema + "\".\"" + table + "\" ("
                 + columnList + ") VALUES (" + placeholders + ")";
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            int index = 1;
-            for (Object value : values.values()) {
-                ps.setObject(index++, value);
-            }
-            ps.execute();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to seed table " + table, e);
-        }
     }
 }

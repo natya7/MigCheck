@@ -34,7 +34,8 @@ public class PostgresDialect implements Dialect {
 
     @Override
     public List<Column> columns(DataSource dataSource, String schema, String table) {
-        String sql = "SELECT column_name, data_type, is_nullable "
+        String sql = "SELECT column_name, data_type, is_nullable, is_identity, column_default, "
+                + "character_maximum_length "
                 + "FROM information_schema.columns "
                 + "WHERE table_schema = ? AND table_name = ? "
                 + "ORDER BY ordinal_position";
@@ -45,9 +46,16 @@ public class PostgresDialect implements Dialect {
             ps.setString(2, table);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
+                    String columnDefault = rs.getString("column_default");
+                    boolean generated = "YES".equals(rs.getString("is_identity"))
+                            || (columnDefault != null && columnDefault.startsWith("nextval"));
+                    int length = rs.getInt("character_maximum_length");
+                    Integer maxLength = rs.wasNull() ? null : length;
                     columns.add(new Column(rs.getString("column_name"),
                             rs.getString("data_type"),
-                            "YES".equals(rs.getString("is_nullable"))));
+                            "YES".equals(rs.getString("is_nullable")),
+                            generated,
+                            maxLength));
                 }
             }
         } catch (SQLException e) {
