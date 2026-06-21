@@ -1,7 +1,7 @@
 package io.migcheck.eval;
 
-import io.migcheck.analysis.RiskLevel;
 import io.migcheck.analysis.StaticAnalyzer;
+import io.migcheck.analysis.StaticResult;
 import io.migcheck.report.DynamicOutcome;
 import io.migcheck.tester.MigrationTester;
 
@@ -22,10 +22,11 @@ public class EvaluationHarness {
     public ComparisonReport evaluate(DataSource dataSource, List<EvalCase> cases) {
         List<EvalRow> rows = new ArrayList<>();
         for (EvalCase c : cases) {
-            RiskLevel staticRisk = analyzer.analyze(c.forwardSql()).risk();
+            StaticResult staticResult = analyzer.analyze(c.forwardSql());
             DynamicOutcome dynamic = tester.run(c.engine(), dataSource, c.scenario())
                     .dynamicResult().outcome();
-            rows.add(new EvalRow(c.name(), staticRisk, dynamic, c.scenario().expectedOutcome()));
+            rows.add(new EvalRow(c.name(), staticResult.risk(), staticResult.findings(),
+                    dynamic, c.scenario().expectedOutcome()));
         }
         return new ComparisonReport(rows);
     }

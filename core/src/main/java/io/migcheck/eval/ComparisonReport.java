@@ -4,6 +4,7 @@ import io.migcheck.analysis.RiskLevel;
 import io.migcheck.report.DynamicOutcome;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class ComparisonReport {
 
@@ -35,11 +36,12 @@ public class ComparisonReport {
 
     public String toMarkdown() {
         StringBuilder sb = new StringBuilder();
-        sb.append("| Scenario | Static risk | Static verdict | Dynamic | Ground truth |\n");
-        sb.append("|---|---|---|---|---|\n");
+        sb.append("| Scenario | Static risk | Static findings | Static verdict | Dynamic | Ground truth |\n");
+        sb.append("|---|---|---|---|---|---|\n");
         for (EvalRow r : rows) {
             sb.append("| ").append(r.name())
                     .append(" | ").append(r.staticRisk())
+                    .append(" | ").append(describeFindings(r))
                     .append(" | ").append(staticUnsafe(r) ? "DATA_LOST" : "PRESERVED")
                     .append(" | ").append(r.dynamicOutcome())
                     .append(" | ").append(r.groundTruth())
@@ -50,6 +52,15 @@ public class ComparisonReport {
         sb.append("\nDynamic: false positives=").append(dynamicFalsePositives())
                 .append(", false negatives=").append(dynamicFalseNegatives());
         return sb.toString();
+    }
+
+    private String describeFindings(EvalRow r) {
+        if (r.staticFindings().isEmpty()) {
+            return "(none)";
+        }
+        return r.staticFindings().stream()
+                .map(f -> f.risk() + ": " + f.message())
+                .collect(Collectors.joining("; "));
     }
 
     private boolean staticUnsafe(EvalRow r) {

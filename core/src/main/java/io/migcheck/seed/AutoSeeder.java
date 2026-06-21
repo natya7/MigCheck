@@ -87,7 +87,13 @@ public class AutoSeeder {
                 if (column.generated() || compositeColumns.contains(column.name())) {
                     continue;
                 }
-                values.put(column.name(), valueFor(column, row, fkTargets, primaryKeys));
+                if (row == 0 && column.nullable()
+                        && !pkColumns.contains(column.name())
+                        && !fkTargets.containsKey(column.name())) {
+                    values.put(column.name(), null);
+                } else {
+                    values.put(column.name(), valueFor(column, row, fkTargets, primaryKeys));
+                }
             }
             Object generatedKey = insertRow(dataSource, table, values, generatedPk);
             if (pkColumns.size() == 1) {

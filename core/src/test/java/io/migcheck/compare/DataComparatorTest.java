@@ -33,14 +33,29 @@ class DataComparatorTest {
         assertThat(comparator.compare(before, after).hasDataLoss()).isFalse();
     }
 
+    @Test
+    void detectsModifiedRowByPrimaryKey() {
+        Snapshot before = snapshotOf(row(1, "Ada"));
+        Snapshot after = snapshotOf(row(1, "Ada Lovelace"));
+
+        SnapshotDiff diff = comparator.compare(before, after);
+
+        assertThat(diff.hasDataLoss()).isTrue();
+        SnapshotDiff.RowChange change = diff.changedTables().get("person").modifiedRows().get(0);
+        assertThat(change.changedColumns()).containsExactly("name");
+        assertThat(change.before().get("name")).isEqualTo("Ada");
+        assertThat(change.after().get("name")).isEqualTo("Ada Lovelace");
+        assertThat(diff.summary()).contains("column name changed Ada -> Ada Lovelace");
+    }
+
     private Map<String, Object> row(Object id, String name) {
         return Map.of("id", id, "name", name);
     }
 
     @SafeVarargs
     private Snapshot snapshotOf(Map<String, Object>... rows) {
-        TableSnapshot ts =
-                new TableSnapshot("person", List.of("id", "name"), List.of(rows));
+        TableSnapshot ts = new TableSnapshot("person", List.of("id", "name"),
+                List.of("id"), List.of(rows));
         return new Snapshot(Map.of("person", ts));
     }
 }

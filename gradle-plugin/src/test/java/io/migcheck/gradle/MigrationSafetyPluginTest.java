@@ -68,6 +68,19 @@ class MigrationSafetyPluginTest {
         assertThat(result.getOutput()).contains("PASS").contains("V1__create_users.sql");
     }
 
+    @Test
+    void listsEveryFindingAndPrintsSummary() throws Exception {
+        setUpProject();
+        write("migrations/V1__multi.sql",
+                "DROP TABLE users; ALTER TABLE accounts DROP COLUMN email");
+
+        BuildResult result = runner("migrationSafetyStatic").buildAndFail();
+
+        assertThat(result.getOutput()).contains("DROP TABLE users");
+        assertThat(result.getOutput()).contains("DROP COLUMN email");
+        assertThat(result.getOutput()).contains("checked 1 migrations");
+    }
+
     private void setUpProject() throws Exception {
         write("settings.gradle", "rootProject.name = 'sample'");
         write("build.gradle",

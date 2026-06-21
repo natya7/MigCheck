@@ -39,6 +39,7 @@ public class SnapshotEngine {
 
     private TableSnapshot captureTable(DataSource dataSource, String table) {
         List<String> columns = dialect.columnNames(dataSource, schema, table);
+        List<String> pkColumns = dialect.primaryKeyColumns(dataSource, schema, table);
         List<Map<String, Object>> rows = new ArrayList<>();
         String sql = "SELECT * FROM \"" + schema + "\".\"" + table + "\"";
         try (Connection conn = dataSource.getConnection();
@@ -54,6 +55,6 @@ public class SnapshotEngine {
         } catch (Exception e) {
             throw new RuntimeException("Failed to snapshot table " + table, e);
         }
-        return new TableSnapshot(table, columns, rows);
+        return new TableSnapshot(table, columns, pkColumns, rows);
     }
 }

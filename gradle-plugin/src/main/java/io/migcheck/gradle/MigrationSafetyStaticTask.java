@@ -1,7 +1,9 @@
 package io.migcheck.gradle;
 
+import io.migcheck.analysis.Finding;
 import io.migcheck.analysis.RiskLevel;
 import io.migcheck.analysis.StaticAnalyzer;
+import io.migcheck.analysis.StaticResult;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
 import org.gradle.api.file.ProjectLayout;
@@ -43,15 +45,24 @@ public abstract class MigrationSafetyStaticTask extends DefaultTask {
         }
         StaticAnalyzer analyzer = new StaticAnalyzer();
         boolean failOnWarning = getFailOnWarning().getOrElse(false);
-        boolean failed = false;
+        int failCount = 0;
+        int warnCount = 0;
         for (File file : files) {
-            RiskLevel risk = analyzer.analyze(read(file)).risk();
+            StaticResult result = analyzer.analyze(read(file));
+            RiskLevel risk = result.risk();
             getLogger().lifecycle(label(risk) + "  " + file.getName());
-            if (risk == RiskLevel.HIGH || (failOnWarning && risk == RiskLevel.MEDIUM)) {
-                failed = true;
+            for (Finding finding : result.findings()) {
+                getLogger().lifecycle("    - " + finding.risk() + ": " + finding.message());
+            }
+            if (risk == RiskLevel.HIGH) {
+                failCount++;
+            } else if (risk == RiskLevel.MEDIUM) {
+                warnCount++;
             }
         }
-        if (failed) {
+        getLogger().lifecycle("checked " + files.length + " migrations: "
+                + failCount + " FAIL, " + warnCount + " WARNING");
+        if (failCount > 0 || (failOnWarning && warnCount > 0)) {
             throw new GradleException("Migration safety check failed");
         }
     }
