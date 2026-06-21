@@ -21,5 +21,6 @@ postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" 
 mysql = { module = "com.mysql:mysql-connector-j", version.ref = "mysql" }
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
 flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
+flyway-mysql = { module = "org.flywaydb:flyway-mysql", version.ref = "flyway" }
 liquibase-core = { module = "org.liquibase:liquibase-core", version.ref = "liquibase" }
 jsqlparser = { module = "com.github.jsqlparser:jsqlparser", version.ref = "jsqlparser" }

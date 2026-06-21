@@ -25,7 +25,9 @@ dependencies {
     compileOnly(libs.junit.jupiter)
     compileOnly(platform(libs.testcontainers.bom))
     compileOnly(libs.testcontainers.postgresql)
+    compileOnly(libs.testcontainers.mysql)
     compileOnly(libs.postgresql)
+    compileOnly(libs.mysql)
 }
 
 tasks.test { useJUnitPlatform() }

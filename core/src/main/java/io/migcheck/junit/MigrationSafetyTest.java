@@ -11,4 +11,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @ExtendWith(MigrationSafetyExtension.class)
 public @interface MigrationSafetyTest {
+
+    Database database() default Database.POSTGRES;
 }

@@ -10,6 +10,7 @@ dependencies {
     api(project(":core"))
     implementation(libs.flyway.core)
     runtimeOnly(libs.flyway.postgresql)
+    testRuntimeOnly(libs.flyway.mysql)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
