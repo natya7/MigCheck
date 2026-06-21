@@ -164,16 +164,16 @@ public class AutoSeeder {
     }
 
     private String buildInsert(String table, Map<String, Object> values) {
+        String qualified = dialect.quoteIdentifier(schema) + "." + dialect.quoteIdentifier(table);
         if (values.isEmpty()) {
-            return "INSERT INTO \"" + schema + "\".\"" + table + "\" DEFAULT VALUES";
+            return dialect.emptyInsert(qualified);
         }
         String columnList = values.keySet().stream()
-                .map(name -> "\"" + name + "\"")
+                .map(dialect::quoteIdentifier)
                 .collect(Collectors.joining(", "));
         String placeholders = values.values().stream()
                 .map(v -> "?")
                 .collect(Collectors.joining(", "));
-        return "INSERT INTO \"" + schema + "\".\"" + table + "\" ("
-                + columnList + ") VALUES (" + placeholders + ")";
+        return "INSERT INTO " + qualified + " (" + columnList + ") VALUES (" + placeholders + ")";
     }
 }

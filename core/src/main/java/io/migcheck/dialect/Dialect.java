@@ -19,5 +19,13 @@ public interface Dialect {
         return List.of();
     }
 
+    default String quoteIdentifier(String identifier) {
+        return "\"" + identifier + "\"";
+    }
+
+    default String emptyInsert(String qualifiedTable) {
+        return "INSERT INTO " + qualifiedTable + " DEFAULT VALUES";
+    }
+
     Object sampleValue(String dataType, int seed);
 }

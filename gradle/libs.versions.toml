@@ -3,6 +3,7 @@ junit = "5.11.3"
 assertj = "3.26.3"
 testcontainers = "1.20.4"
 postgresql = "42.7.4"
+mysql = "8.4.0"
 flyway = "10.20.1"
 liquibase = "4.30.0"
 jsqlparser = "5.0"
@@ -14,8 +15,10 @@ junit-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql" }
+testcontainers-mysql = { module = "org.testcontainers:mysql" }
 testcontainers-junit = { module = "org.testcontainers:junit-jupiter" }
 postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+mysql = { module = "com.mysql:mysql-connector-j", version.ref = "mysql" }
 flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
 flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
 liquibase-core = { module = "org.liquibase:liquibase-core", version.ref = "liquibase" }

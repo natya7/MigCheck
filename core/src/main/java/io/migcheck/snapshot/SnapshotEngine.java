@@ -41,7 +41,8 @@ public class SnapshotEngine {
         List<String> columns = dialect.columnNames(dataSource, schema, table);
         List<String> pkColumns = dialect.primaryKeyColumns(dataSource, schema, table);
         List<Map<String, Object>> rows = new ArrayList<>();
-        String sql = "SELECT * FROM \"" + schema + "\".\"" + table + "\"";
+        String sql = "SELECT * FROM " + dialect.quoteIdentifier(schema) + "."
+                + dialect.quoteIdentifier(table);
         try (Connection conn = dataSource.getConnection();
              Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery(sql)) {

@@ -12,7 +12,9 @@ dependencies {
 
     testFixturesApi(platform(libs.testcontainers.bom))
     testFixturesApi(libs.testcontainers.postgresql)
+    testFixturesApi(libs.testcontainers.mysql)
     testFixturesApi(libs.postgresql)
+    testFixturesApi(libs.mysql)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
