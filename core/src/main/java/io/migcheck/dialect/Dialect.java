@@ -15,5 +15,9 @@ public interface Dialect {
 
     List<ForeignKey> foreignKeys(DataSource dataSource, String schema);
 
+    default List<CompositeForeignKey> compositeForeignKeys(DataSource dataSource, String schema) {
+        return List.of();
+    }
+
     Object sampleValue(String dataType, int seed);
 }

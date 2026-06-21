@@ -1,6 +1,7 @@
 package io.migcheck.seed;
 
 import io.migcheck.dialect.Column;
+import io.migcheck.dialect.CompositeForeignKey;
 import io.migcheck.dialect.Dialect;
 import io.migcheck.dialect.ForeignKey;
 
@@ -11,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,15 +39,19 @@ public class AutoSeeder {
         List<String> tables = new ArrayList<>(dialect.tableNames(dataSource, schema));
         tables.removeAll(ignoredTables);
         List<ForeignKey> foreignKeys = dialect.foreignKeys(dataSource, schema);
+        List<CompositeForeignKey> compositeKeys = dialect.compositeForeignKeys(dataSource, schema);
         List<String> order = new DependencyGraph(tables, foreignKeys).topologicalOrder();
         Map<String, List<Object>> primaryKeys = new HashMap<>();
+        Map<String, List<Map<String, Object>>> primaryTuples = new HashMap<>();
         for (String table : order) {
-            seedTable(dataSource, table, foreignKeys, primaryKeys);
+            seedTable(dataSource, table, foreignKeys, compositeKeys, primaryKeys, primaryTuples);
         }
     }
 
     private void seedTable(DataSource dataSource, String table, List<ForeignKey> foreignKeys,
-                           Map<String, List<Object>> primaryKeys) {
+                           List<CompositeForeignKey> compositeKeys,
+                           Map<String, List<Object>> primaryKeys,
+                           Map<String, List<Map<String, Object>>> primaryTuples) {
         List<Column> columns = dialect.columns(dataSource, schema, table);
         List<String> pkColumns = dialect.primaryKeyColumns(dataSource, schema, table);
         Map<String, String> fkTargets = new HashMap<>();
@@ -54,13 +60,31 @@ public class AutoSeeder {
                 fkTargets.put(fk.column(), fk.referencedTable());
             }
         }
+        List<CompositeForeignKey> composites = new ArrayList<>();
+        Set<String> compositeColumns = new HashSet<>();
+        for (CompositeForeignKey cfk : compositeKeys) {
+            if (cfk.childTable().equals(table)) {
+                composites.add(cfk);
+                compositeColumns.addAll(cfk.childColumns());
+            }
+        }
         String generatedPk = pkColumns.size() == 1 && isGenerated(columns, pkColumns.get(0))
                 ? pkColumns.get(0) : null;
         List<Object> insertedKeys = new ArrayList<>();
+        List<Map<String, Object>> insertedTuples = new ArrayList<>();
         for (int row = 0; row < rowsPerTable; row++) {
             Map<String, Object> values = new LinkedHashMap<>();
+            for (CompositeForeignKey cfk : composites) {
+                List<Map<String, Object>> parent = primaryTuples.getOrDefault(cfk.parentTable(), List.of());
+                if (!parent.isEmpty()) {
+                    Map<String, Object> parentRow = parent.get(row % parent.size());
+                    for (int i = 0; i < cfk.childColumns().size(); i++) {
+                        values.put(cfk.childColumns().get(i), parentRow.get(cfk.parentColumns().get(i)));
+                    }
+                }
+            }
             for (Column column : columns) {
-                if (column.generated()) {
+                if (column.generated() || compositeColumns.contains(column.name())) {
                     continue;
                 }
                 values.put(column.name(), valueFor(column, row, fkTargets, primaryKeys));
@@ -69,8 +93,15 @@ public class AutoSeeder {
             if (pkColumns.size() == 1) {
                 insertedKeys.add(generatedPk != null ? generatedKey : values.get(pkColumns.get(0)));
             }
+            Map<String, Object> tuple = new LinkedHashMap<>();
+            for (String pk : pkColumns) {
+                tuple.put(pk, generatedPk != null && pk.equals(generatedPk)
+                        ? generatedKey : values.get(pk));
+            }
+            insertedTuples.add(tuple);
         }
         primaryKeys.put(table, insertedKeys);
+        primaryTuples.put(table, insertedTuples);
     }
 
     private boolean isGenerated(List<Column> columns, String name) {
@@ -85,10 +116,22 @@ public class AutoSeeder {
             return parentKeys.isEmpty() ? null : parentKeys.get(row % parentKeys.size());
         }
         Object value = dialect.sampleValue(column.dataType(), row + 1);
-        if (value instanceof String s && column.maxLength() != null && s.length() > column.maxLength()) {
-            return s.substring(0, column.maxLength());
+        if (value instanceof String s) {
+            return fitString(s, column.maxLength());
         }
         return value;
+    }
+
+    private String fitString(String base, Integer maxLength) {
+        int target = maxLength != null ? Math.min(maxLength, 64) : 24;
+        if (base.length() >= target) {
+            return base.substring(0, target);
+        }
+        StringBuilder sb = new StringBuilder(base);
+        while (sb.length() < target) {
+            sb.append('x');
+        }
+        return sb.toString();
     }
 
     private Object insertRow(DataSource dataSource, String table, Map<String, Object> values,

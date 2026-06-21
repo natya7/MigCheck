@@ -10,7 +10,9 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class PostgresDialect implements Dialect {
@@ -118,12 +120,58 @@ public class PostgresDialect implements Dialect {
     }
 
     @Override
+    public List<CompositeForeignKey> compositeForeignKeys(DataSource dataSource, String schema) {
+        String sql = "SELECT rc.constraint_name AS cname, kcu.table_name AS child_table, "
+                + "kcu.column_name AS child_column, ccu.table_name AS parent_table, "
+                + "ccu.column_name AS parent_column "
+                + "FROM information_schema.referential_constraints rc "
+                + "JOIN information_schema.key_column_usage kcu "
+                + "  ON kcu.constraint_name = rc.constraint_name "
+                + " AND kcu.constraint_schema = rc.constraint_schema "
+                + "JOIN information_schema.key_column_usage ccu "
+                + "  ON ccu.constraint_name = rc.unique_constraint_name "
+                + " AND ccu.constraint_schema = rc.unique_constraint_schema "
+                + " AND ccu.ordinal_position = kcu.position_in_unique_constraint "
+                + "WHERE kcu.table_schema = ? "
+                + "ORDER BY rc.constraint_name, kcu.ordinal_position";
+        Map<String, String> childTables = new LinkedHashMap<>();
+        Map<String, String> parentTables = new LinkedHashMap<>();
+        Map<String, List<String>> childColumns = new LinkedHashMap<>();
+        Map<String, List<String>> parentColumns = new LinkedHashMap<>();
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, schema);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String name = rs.getString("cname");
+                    childTables.put(name, rs.getString("child_table"));
+                    parentTables.put(name, rs.getString("parent_table"));
+                    childColumns.computeIfAbsent(name, k -> new ArrayList<>())
+                            .add(rs.getString("child_column"));
+                    parentColumns.computeIfAbsent(name, k -> new ArrayList<>())
+                            .add(rs.getString("parent_column"));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        List<CompositeForeignKey> result = new ArrayList<>();
+        for (String name : childColumns.keySet()) {
+            if (childColumns.get(name).size() > 1) {
+                result.add(new CompositeForeignKey(childTables.get(name), parentTables.get(name),
+                        childColumns.get(name), parentColumns.get(name)));
+            }
+        }
+        return result;
+    }
+
+    @Override
     public Object sampleValue(String dataType, int seed) {
         return switch (dataType) {
             case "bigint" -> (long) seed;
             case "integer", "smallint" -> seed;
             case "boolean" -> seed % 2 == 0;
-            case "numeric", "real", "double precision" -> (double) seed;
+            case "numeric", "real", "double precision" -> seed + 0.3457;
             case "date" -> Date.valueOf(LocalDate.of(2020, 1, 1).plusDays(seed));
             case "timestamp without time zone", "timestamp with time zone" ->
                     Timestamp.valueOf(LocalDateTime.of(2020, 1, 1, 0, 0).plusMinutes(seed));
