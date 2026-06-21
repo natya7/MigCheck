@@ -8,10 +8,14 @@ java {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":flyway"))
+
+    runtimeOnly(libs.postgresql)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.assertj.core)
+    testImplementation(testFixtures(project(":core")))
     testRuntimeOnly(libs.junit.launcher)
 }
 
@@ -26,6 +30,5 @@ gradlePlugin {
 
 tasks.test {
     useJUnitPlatform()
-    maxHeapSize = "128m"
-    jvmArgs("-Xms32m")
+    maxHeapSize = "512m"
 }

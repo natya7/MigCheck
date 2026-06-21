@@ -28,6 +28,18 @@ public final class PostgresSupport {
         return ds;
     }
 
+    public static String jdbcUrl() {
+        return CONTAINER.getJdbcUrl();
+    }
+
+    public static String username() {
+        return CONTAINER.getUsername();
+    }
+
+    public static String password() {
+        return CONTAINER.getPassword();
+    }
+
     public static void reset() {
         try (Connection conn = dataSource().getConnection();
              Statement st = conn.createStatement()) {

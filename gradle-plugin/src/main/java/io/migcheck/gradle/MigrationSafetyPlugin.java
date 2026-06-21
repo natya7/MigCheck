@@ -19,10 +19,26 @@ public class MigrationSafetyPlugin implements Plugin<Project> {
                     task.getFailOnWarning().convention(false);
                 });
 
+        TaskProvider<MigrationSafetyDynamicTask> dynamicTask = project.getTasks()
+                .register("migrationSafetyTest", MigrationSafetyDynamicTask.class, task -> {
+                    task.setGroup("verification");
+                    task.setDescription("Runs the UP-DOWN-UP rollback safety check against a database");
+                    task.getMigrationDir().set(project.provider(extension::getMigrationDir));
+                    task.getJdbcUrl().set(project.provider(extension::getJdbcUrl));
+                    task.getUsername().set(project.provider(extension::getUsername));
+                    task.getPassword().set(project.provider(extension::getPassword));
+                    task.getRollbackSql().set(project.provider(extension::getRollbackSql));
+                    task.getDatabase().set(project.provider(extension::getDatabase));
+                    task.getSchema().set(project.provider(extension::getSchema));
+                    task.onlyIf("migrationSafety.jdbcUrl is configured",
+                            t -> task.getJdbcUrl().isPresent());
+                });
+
         project.getTasks().register("migrationSafetyCheck", task -> {
             task.setGroup("verification");
             task.setDescription("Runs all migration safety checks");
             task.dependsOn(staticTask);
+            task.dependsOn(dynamicTask);
         });
     }
 }
