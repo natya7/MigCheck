@@ -88,6 +88,26 @@ public class MySqlDialect implements Dialect {
     }
 
     @Override
+    public String columnType(DataSource dataSource, String schema, String table, String column) {
+        String sql = "SELECT column_type FROM information_schema.columns "
+                + "WHERE table_schema = ? AND table_name = ? AND column_name = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, schema);
+            ps.setString(2, table);
+            ps.setString(3, column);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new RuntimeException("No such column: " + table + "." + column);
+                }
+                return rs.getString(1);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
     public List<ForeignKey> foreignKeys(DataSource dataSource, String schema) {
         String sql = "SELECT table_name, referenced_table_name, column_name "
                 + "FROM information_schema.key_column_usage "

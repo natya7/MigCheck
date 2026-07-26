@@ -93,6 +93,37 @@ public class PostgresDialect implements Dialect {
     }
 
     @Override
+    public String columnType(DataSource dataSource, String schema, String table, String column) {
+        String sql = "SELECT data_type, character_maximum_length, numeric_precision, numeric_scale "
+                + "FROM information_schema.columns "
+                + "WHERE table_schema = ? AND table_name = ? AND column_name = ?";
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, schema);
+            ps.setString(2, table);
+            ps.setString(3, column);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw new RuntimeException("No such column: " + table + "." + column);
+                }
+                String dataType = rs.getString("data_type");
+                int length = rs.getInt("character_maximum_length");
+                if (!rs.wasNull()) {
+                    return dataType + "(" + length + ")";
+                }
+                if ("numeric".equals(dataType) || "decimal".equals(dataType)) {
+                    int precision = rs.getInt("numeric_precision");
+                    int scale = rs.getInt("numeric_scale");
+                    return dataType + "(" + precision + "," + scale + ")";
+                }
+                return dataType;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
     public List<ForeignKey> foreignKeys(DataSource dataSource, String schema) {
         String sql = "SELECT tc.table_name, ccu.table_name AS referenced_table, "
                 + "       kcu.column_name "

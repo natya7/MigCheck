@@ -39,7 +39,11 @@ public class FlywayEngine implements MigrationEngine {
         try (Connection conn = dataSource.getConnection()) {
             conn.setAutoCommit(false);
             try (Statement st = conn.createStatement()) {
-                st.execute(rollbackSql);
+                for (String part : rollbackSql.split(";")) {
+                    if (!part.isBlank()) {
+                        st.execute(part);
+                    }
+                }
                 st.execute("DELETE FROM " + HISTORY_TABLE + " WHERE installed_rank = "
                         + "(SELECT max_rank FROM (SELECT MAX(installed_rank) max_rank FROM "
                         + HISTORY_TABLE + ") AS latest)");

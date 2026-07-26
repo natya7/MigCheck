@@ -13,6 +13,8 @@ public interface Dialect {
 
     List<String> primaryKeyColumns(DataSource dataSource, String schema, String table);
 
+    String columnType(DataSource dataSource, String schema, String table, String column);
+
     List<ForeignKey> foreignKeys(DataSource dataSource, String schema);
 
     default List<CompositeForeignKey> compositeForeignKeys(DataSource dataSource, String schema) {

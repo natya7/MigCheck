@@ -49,6 +49,15 @@ class MySqlDialectIT {
         assertThat(comparator.compare(before, after).hasDataLoss()).isTrue();
     }
 
+    @Test
+    void reportsExactColumnTypes() throws Exception {
+        exec("CREATE TABLE typed (id BIGINT PRIMARY KEY, label VARCHAR(40), amount DECIMAL(14,4))");
+
+        assertThat(dialect.columnType(ds, schema, "typed", "id")).isEqualTo("bigint");
+        assertThat(dialect.columnType(ds, schema, "typed", "label")).isEqualTo("varchar(40)");
+        assertThat(dialect.columnType(ds, schema, "typed", "amount")).isEqualTo("decimal(14,4)");
+    }
+
     private int orphanOrders() throws Exception {
         return scalar("SELECT COUNT(*) FROM `order` o WHERE NOT EXISTS "
                 + "(SELECT 1 FROM customer c WHERE c.id = o.customer_id)");

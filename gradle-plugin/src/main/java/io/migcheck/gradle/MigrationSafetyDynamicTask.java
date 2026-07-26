@@ -5,6 +5,11 @@ import io.migcheck.dialect.Dialect;
 import io.migcheck.dialect.MySqlDialect;
 import io.migcheck.dialect.PostgresDialect;
 import io.migcheck.flyway.FlywayEngine;
+import io.migcheck.repair.MySqlRepairTemplates;
+import io.migcheck.repair.PostgresRepairTemplates;
+import io.migcheck.repair.RepairTemplates;
+import io.migcheck.repair.RollbackRepair;
+import io.migcheck.repair.RollbackRepairer;
 import io.migcheck.report.DynamicOutcome;
 import io.migcheck.report.SafetyReport;
 import io.migcheck.seed.AutoSeeder;
@@ -22,7 +27,9 @@ import org.gradle.api.tasks.TaskAction;
 import javax.inject.Inject;
 import javax.sql.DataSource;
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -85,7 +92,43 @@ public abstract class MigrationSafetyDynamicTask extends DefaultTask {
         SafetyReport report = tester.run(engine, dataSource, scenario);
         getLogger().lifecycle(report.describe());
         if (!report.isSafe()) {
+            suggestRepair(dataSource, dialect, schema, tester, engine, scenario);
             throw new GradleException("Rollback safety check failed");
+        }
+    }
+
+    private void suggestRepair(DataSource dataSource, Dialect dialect, String schema,
+                               MigrationTester tester, FlywayEngine engine,
+                               MigrationScenario scenario) {
+        try {
+            RepairTemplates templates = dialect instanceof MySqlDialect
+                    ? new MySqlRepairTemplates() : new PostgresRepairTemplates();
+            RollbackRepairer repairer = new RollbackRepairer(dialect, templates, schema);
+            java.util.Optional<RollbackRepair> repair =
+                    repairer.repair(dataSource, scenario.rollbackSql());
+            if (repair.isEmpty()) {
+                return;
+            }
+            MigrationScenario candidate = new MigrationScenario(scenario.name() + " repaired",
+                    scenario.migrationsLocation(), null,
+                    repair.get().safeRollbackSql(), DynamicOutcome.PRESERVED);
+            SafetyReport verified = tester.runWithRestore(engine, dataSource, candidate,
+                    repair.get().restoreSql());
+            if (!verified.isSafe()) {
+                return;
+            }
+            File outDir = getProjectLayout().getBuildDirectory().dir("migcheck").get().getAsFile();
+            outDir.mkdirs();
+            File safe = new File(outDir, "safe-rollback.sql");
+            File restore = new File(outDir, "restore-after-redeploy.sql");
+            Files.writeString(safe.toPath(), repair.get().safeRollbackSql() + "\n");
+            Files.writeString(restore.toPath(), repair.get().restoreSql() + "\n");
+            getLogger().lifecycle("[MigCheck] verified safe rollback available:");
+            getLogger().lifecycle("[MigCheck]   " + safe.getAbsolutePath());
+            getLogger().lifecycle("[MigCheck]   " + restore.getAbsolutePath()
+                    + " (run after the migration is deployed again)");
+        } catch (RuntimeException | IOException e) {
+            getLogger().info("Could not build a safe rollback suggestion: " + e.getMessage());
         }
     }
 

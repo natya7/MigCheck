@@ -41,6 +41,16 @@ class PostgresDialectIT {
                 .containsExactly("id", "country_id");
     }
 
+    @Test
+    void reportsExactColumnTypes() throws Exception {
+        exec("CREATE TABLE typed (id BIGINT PRIMARY KEY, label VARCHAR(40), amount NUMERIC(14,4))");
+
+        assertThat(dialect.columnType(ds, "public", "typed", "id")).isEqualTo("bigint");
+        assertThat(dialect.columnType(ds, "public", "typed", "label"))
+                .isEqualTo("character varying(40)");
+        assertThat(dialect.columnType(ds, "public", "typed", "amount")).isEqualTo("numeric(14,4)");
+    }
+
     private void exec(String sql) throws Exception {
         try (Connection c = ds.getConnection(); Statement s = c.createStatement()) {
             s.execute(sql);

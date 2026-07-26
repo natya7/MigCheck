@@ -28,6 +28,11 @@ public class MigrationTester {
     }
 
     public SafetyReport run(MigrationEngine engine, DataSource ds, MigrationScenario scenario) {
+        return runWithRestore(engine, ds, scenario, null);
+    }
+
+    public SafetyReport runWithRestore(MigrationEngine engine, DataSource ds,
+                                       MigrationScenario scenario, String restoreSql) {
         engine.clean(ds);
         engine.migrate(ds);
         seed(ds, engine, scenario);
@@ -35,6 +40,9 @@ public class MigrationTester {
 
         engine.rollback(ds, scenario.rollbackSql());
         engine.migrate(ds);
+        if (restoreSql != null && !restoreSql.isBlank()) {
+            execute(ds, restoreSql);
+        }
         Snapshot after = snapshots.capture(ds, engine.metadataTables());
 
         SnapshotDiff diff = comparator.compare(before, after);
@@ -54,7 +62,11 @@ public class MigrationTester {
     private void execute(DataSource ds, String sql) {
         try (Connection conn = ds.getConnection();
              Statement st = conn.createStatement()) {
-            st.execute(sql);
+            for (String part : sql.split(";")) {
+                if (!part.isBlank()) {
+                    st.execute(part);
+                }
+            }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to run SQL: " + sql, e);
         }

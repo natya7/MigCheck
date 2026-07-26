@@ -111,6 +111,27 @@ For stricter CI, also fail on warnings:
 ./gradlew migrationSafetyStatic --fail-on-warning
 ```
 
+## Safe rollback suggestions
+
+When the dynamic check (`./gradlew migrationSafetyTest`) finds a rollback that loses
+data, MigCheck tries to repair it: instead of destroying the data, the generated
+rollback *parks* it in a backup table, and a companion script restores it after the
+migration is deployed again. The suggestion is verified with the same round-trip loop
+before it is shown — an unverified script is never suggested.
+
+```
+[MigCheck] FAIL - migrationSafetyTest
+table users: row {id=1} column score changed 100 ->
+[MigCheck] verified safe rollback available:
+[MigCheck]   build/migcheck/safe-rollback.sql
+[MigCheck]   build/migcheck/restore-after-redeploy.sql (run after the migration is deployed again)
+```
+
+Repairs cover dropped columns, dropped tables (renamed aside instead), lossy type
+narrowing, NULL-collapsing updates, and row deletes including cascade children. A
+rollback outside these shapes gets no suggestion — MigCheck refuses rather than
+guessing.
+
 ## Building
 
 ```

@@ -1,0 +1,1 @@
+ALTER TABLE measurement ALTER COLUMN amount TYPE NUMERIC(14,4);
