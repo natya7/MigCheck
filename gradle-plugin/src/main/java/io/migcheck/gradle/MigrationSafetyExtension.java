@@ -3,6 +3,7 @@ package io.migcheck.gradle;
 public class MigrationSafetyExtension {
 
     private String migrationDir = "src/main/resources/db/migration";
+    private String rollbackDir = "src/main/resources/db/rollback";
     private String jdbcUrl;
     private String username = "";
     private String password = "";
@@ -16,6 +17,14 @@ public class MigrationSafetyExtension {
 
     public void setMigrationDir(String migrationDir) {
         this.migrationDir = migrationDir;
+    }
+
+    public String getRollbackDir() {
+        return rollbackDir;
+    }
+
+    public void setRollbackDir(String rollbackDir) {
+        this.rollbackDir = rollbackDir;
     }
 
     public String getJdbcUrl() {

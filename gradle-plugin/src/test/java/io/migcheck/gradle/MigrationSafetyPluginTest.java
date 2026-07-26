@@ -130,6 +130,32 @@ class MigrationSafetyPluginTest {
         assertThat(new File(projectDir, "build/migcheck/restore-after-redeploy.sql")).exists();
     }
 
+    @Test
+    void certifyTaskReportsPerMigrationVerdicts() throws Exception {
+        io.migcheck.testing.PostgresSupport.reset();
+        write("settings.gradle", "rootProject.name = 'sample'");
+        write("build.gradle",
+                "plugins { id 'io.migcheck.migration-safety' }\n"
+                        + "migrationSafety {\n"
+                        + "  migrationDir = 'migrations'\n"
+                        + "  rollbackDir = 'rollback'\n"
+                        + "  jdbcUrl = '" + io.migcheck.testing.PostgresSupport.jdbcUrl() + "'\n"
+                        + "  username = '" + io.migcheck.testing.PostgresSupport.username() + "'\n"
+                        + "  password = '" + io.migcheck.testing.PostgresSupport.password() + "'\n"
+                        + "}\n");
+        write("gradle.properties", "org.gradle.jvmargs=-Xmx512m");
+        write("migrations/V1__init.sql",
+                "CREATE TABLE account (id BIGINT PRIMARY KEY, balance INT NOT NULL)");
+        write("migrations/V2__add_note.sql", "ALTER TABLE account ADD COLUMN note VARCHAR(50)");
+        write("rollback/U2__drop_note.sql", "ALTER TABLE account DROP COLUMN note");
+
+        BuildResult result = runner("migrationSafetyCertify").buildAndFail();
+
+        assertThat(result.getOutput()).contains("V1").contains("no rollback script");
+        assertThat(result.getOutput()).contains("V2").contains("DATA_LOST");
+        assertThat(result.getOutput()).contains("certified 1/2 migrations");
+    }
+
     private void setUpProject() throws Exception {
         write("settings.gradle", "rootProject.name = 'sample'");
         write("build.gradle",

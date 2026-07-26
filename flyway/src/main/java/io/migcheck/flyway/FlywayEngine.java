@@ -1,7 +1,8 @@
 package io.migcheck.flyway;
 
-import io.migcheck.engine.MigrationEngine;
+import io.migcheck.engine.VersionedMigrationEngine;
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationVersion;
 
 import java.util.Set;
 
@@ -10,7 +11,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-public class FlywayEngine implements MigrationEngine {
+public class FlywayEngine implements VersionedMigrationEngine {
 
     private static final String HISTORY_TABLE = "flyway_schema_history";
 
@@ -30,6 +31,16 @@ public class FlywayEngine implements MigrationEngine {
         Flyway.configure()
                 .dataSource(dataSource)
                 .locations(migrationsLocation)
+                .load()
+                .migrate();
+    }
+
+    @Override
+    public void migrateTo(DataSource dataSource, String version) {
+        Flyway.configure()
+                .dataSource(dataSource)
+                .locations(migrationsLocation)
+                .target(MigrationVersion.fromVersion(version))
                 .load()
                 .migrate();
     }

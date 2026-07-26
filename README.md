@@ -132,6 +132,34 @@ narrowing, NULL-collapsing updates, and row deletes including cascade children. 
 rollback outside these shapes gets no suggestion — MigCheck refuses rather than
 guessing.
 
+## Certifying the whole history
+
+`migrationSafetyTest` checks one rollback — the configured one. The certification
+task walks the **entire migration history** and verifies every migration's rollback
+with seeded data, one verdict per migration:
+
+```
+./gradlew migrationSafetyCertify
+./gradlew migrationSafetyCertify --require-rollbacks   # also fail on uncovered migrations
+```
+
+Rollback scripts live in their own directory (`rollbackDir`, default
+`src/main/resources/db/rollback`), named `U<version>__<description>.sql` to pair
+with the matching `V<version>__...` migration. They must not sit next to the
+V-files, because Flyway scans the migrations location and rejects unknown prefixes.
+
+```
+V1  init          no rollback script
+V2  add_note      DATA_LOST
+    table account: row {id=1} column note changed v1x ->
+certified 1/2 migrations: 1 data loss, 1 uncovered
+```
+
+The build fails on any data loss; uncovered migrations only fail with
+`--require-rollbacks`. For comparison, Liquibase's `update-testing-rollback` also
+walks the history, but it only verifies that the rollbacks *execute* — an empty
+database passes. Certification here means the data survived.
+
 ## Building
 
 ```
