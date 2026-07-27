@@ -51,6 +51,20 @@ class HistoryCertifierIT {
     }
 
     @Test
+    void certifiesAParkStyleRollbackPairAsPreserved() throws Exception {
+        Path migrations = Path.of(getClass().getClassLoader()
+                .getResource("scenarios/certify_pair/migrations").toURI());
+        Path rollback = Path.of(getClass().getClassLoader()
+                .getResource("scenarios/certify_pair/rollback").toURI());
+        List<MigrationStep> steps = StepScanner.scan(migrations, rollback);
+        FlywayEngine engine = new FlywayEngine("filesystem:" + migrations);
+
+        CertificationResult result = certifier.certify(engine, ds, steps);
+
+        assertThat(result.steps().get(1).outcome()).isEqualTo(CertificationOutcome.PRESERVED);
+    }
+
+    @Test
     void chainRollsSeveralStepsBackAndDetectsCompoundLoss() throws Exception {
         Path migrations = resource("migrations");
         List<MigrationStep> steps = StepScanner.scan(migrations, resource("rollback"));

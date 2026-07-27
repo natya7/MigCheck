@@ -22,13 +22,17 @@ class StepScannerTest {
         Files.writeString(migrations.resolve("V1__create_users.sql"), "x");
         Files.writeString(migrations.resolve("V10__add_index.sql"), "x");
         Files.writeString(rollback.resolve("U2__drop_note.sql"), "x");
+        Files.writeString(rollback.resolve("R2__restore_note.sql"), "x");
 
         List<MigrationStep> steps = StepScanner.scan(migrations, rollback);
 
         assertThat(steps).extracting(MigrationStep::version)
                 .containsExactly("1", "2", "10");
+        assertThat(steps.get(0).migrationFile()).isNotNull();
         assertThat(steps.get(0).rollbackScript()).isNull();
+        assertThat(steps.get(0).restoreScript()).isNull();
         assertThat(steps.get(1).rollbackScript()).isNotNull();
+        assertThat(steps.get(1).restoreScript()).isNotNull();
         assertThat(steps.get(1).description()).isEqualTo("add_note");
     }
 

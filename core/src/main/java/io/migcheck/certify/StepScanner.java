@@ -16,23 +16,32 @@ public class StepScanner {
 
     private static final Pattern MIGRATION = Pattern.compile("V(.+?)__(.+)\\.sql");
     private static final Pattern ROLLBACK = Pattern.compile("U(.+?)__.+\\.sql");
+    private static final Pattern RESTORE = Pattern.compile("R(.+?)__.+\\.sql");
 
     private StepScanner() {
     }
 
     public static List<MigrationStep> scan(Path migrationDir, Path rollbackDir) {
         Map<String, Path> rollbacks = new LinkedHashMap<>();
+        Map<String, Path> restores = new LinkedHashMap<>();
         for (Path file : list(rollbackDir)) {
-            Matcher m = ROLLBACK.matcher(file.getFileName().toString());
-            if (m.matches()) {
-                rollbacks.put(m.group(1), file);
+            String name = file.getFileName().toString();
+            Matcher rollback = ROLLBACK.matcher(name);
+            if (rollback.matches()) {
+                rollbacks.put(rollback.group(1), file);
+                continue;
+            }
+            Matcher restore = RESTORE.matcher(name);
+            if (restore.matches()) {
+                restores.put(restore.group(1), file);
             }
         }
         List<MigrationStep> steps = new ArrayList<>();
         for (Path file : list(migrationDir)) {
             Matcher m = MIGRATION.matcher(file.getFileName().toString());
             if (m.matches()) {
-                steps.add(new MigrationStep(m.group(1), m.group(2), rollbacks.get(m.group(1))));
+                steps.add(new MigrationStep(m.group(1), m.group(2), file,
+                        rollbacks.get(m.group(1)), restores.get(m.group(1))));
             }
         }
         steps.sort(Comparator.comparing(MigrationStep::version, StepScanner::compareVersions));

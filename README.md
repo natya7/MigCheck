@@ -160,6 +160,29 @@ The build fails on any data loss; uncovered migrations only fail with
 walks the history, but it only verifies that the rollbacks *execute* — an empty
 database passes. Certification here means the data survived.
 
+### Generating the missing rollbacks
+
+For migrations with no rollback script at all, MigCheck can write the draft itself:
+
+```
+./gradlew migrationSafetyCertify --suggest-missing
+```
+
+It inverts the forward migration (`CREATE TABLE` becomes a rename-aside, `ADD
+COLUMN` becomes park-the-values-then-drop), verifies the draft with the same
+round trip, and only writes files that passed:
+
+```
+[MigCheck] generated rollback for V2 -> rollback/U2__undo_add_note.sql
+[MigCheck]   restore -> rollback/R2__restore_add_note.sql (runs after the migration is deployed again)
+[MigCheck] could not generate rollback for V3: cannot invert this migration
+```
+
+`R<version>__*.sql` files in `rollbackDir` are restore companions: the certify
+walk runs them after the re-migrate, so park-style rollback pairs certify as
+PRESERVED. Migrations MigCheck cannot invert (data-writing statements, renames)
+are refused with a reason — never guessed.
+
 ## Building
 
 ```

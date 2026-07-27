@@ -3,12 +3,17 @@ package io.migcheck.gradle;
 import io.migcheck.certify.CertificationResult;
 import io.migcheck.certify.HistoryCertifier;
 import io.migcheck.certify.MigrationStep;
+import io.migcheck.certify.RollbackGenerator;
 import io.migcheck.certify.StepScanner;
+import io.migcheck.certify.Suggestion;
 import io.migcheck.compare.DataComparator;
 import io.migcheck.dialect.Dialect;
 import io.migcheck.dialect.MySqlDialect;
 import io.migcheck.dialect.PostgresDialect;
 import io.migcheck.flyway.FlywayEngine;
+import io.migcheck.repair.MySqlRepairTemplates;
+import io.migcheck.repair.PostgresRepairTemplates;
+import io.migcheck.repair.RepairTemplates;
 import io.migcheck.seed.AutoSeeder;
 import io.migcheck.snapshot.SnapshotEngine;
 import org.gradle.api.DefaultTask;
@@ -57,6 +62,12 @@ public abstract class MigrationSafetyCertifyTask extends DefaultTask {
             description = "Fail when a migration has no rollback script")
     public abstract Property<Boolean> getRequireRollbacks();
 
+    @Input
+    @Optional
+    @Option(option = "suggest-missing",
+            description = "Generate verified rollback drafts for uncovered migrations")
+    public abstract Property<Boolean> getSuggestMissing();
+
     @Inject
     protected abstract ProjectLayout getProjectLayout();
 
@@ -87,11 +98,52 @@ public abstract class MigrationSafetyCertifyTask extends DefaultTask {
                         getUsername().getOrElse(""), getPassword().getOrElse("")), steps);
 
         getLogger().lifecycle(result.describe());
+        if (getSuggestMissing().getOrElse(false) && result.uncovered() > 0) {
+            suggestMissing(certifier, engine, dialect, schema, steps, rollback);
+        }
         if (result.hasDataLoss()) {
             throw new GradleException("Rollback certification failed");
         }
         if (result.uncovered() > 0 && getRequireRollbacks().getOrElse(false)) {
             throw new GradleException(result.uncovered() + " migrations have no rollback script");
+        }
+    }
+
+    private void suggestMissing(HistoryCertifier certifier, FlywayEngine engine,
+                                Dialect dialect, String schema,
+                                List<MigrationStep> steps, File rollbackDir) {
+        RepairTemplates templates = dialect instanceof MySqlDialect
+                ? new MySqlRepairTemplates() : new PostgresRepairTemplates();
+        RollbackGenerator generator = new RollbackGenerator(dialect, templates, schema);
+        List<Suggestion> suggestions = certifier.suggestMissing(engine,
+                new JdbcDataSource(getJdbcUrl().get(),
+                        getUsername().getOrElse(""), getPassword().getOrElse("")),
+                steps, generator);
+        rollbackDir.mkdirs();
+        for (Suggestion suggestion : suggestions) {
+            if (suggestion.rollback() == null) {
+                getLogger().lifecycle("[MigCheck] could not generate rollback for V"
+                        + suggestion.version() + ": " + suggestion.reason());
+                continue;
+            }
+            try {
+                File undo = new File(rollbackDir, "U" + suggestion.version()
+                        + "__undo_" + suggestion.description() + ".sql");
+                java.nio.file.Files.writeString(undo.toPath(),
+                        suggestion.rollback().undoSql() + "\n");
+                getLogger().lifecycle("[MigCheck] generated rollback for V"
+                        + suggestion.version() + " -> " + undo.getAbsolutePath());
+                if (!suggestion.rollback().restoreSql().isBlank()) {
+                    File restore = new File(rollbackDir, "R" + suggestion.version()
+                            + "__restore_" + suggestion.description() + ".sql");
+                    java.nio.file.Files.writeString(restore.toPath(),
+                            suggestion.rollback().restoreSql() + "\n");
+                    getLogger().lifecycle("[MigCheck]   restore -> " + restore.getAbsolutePath()
+                            + " (runs after the migration is deployed again)");
+                }
+            } catch (java.io.IOException e) {
+                throw new GradleException("Could not write rollback draft", e);
+            }
         }
     }
 }

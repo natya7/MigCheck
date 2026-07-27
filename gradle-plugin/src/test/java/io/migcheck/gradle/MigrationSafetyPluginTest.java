@@ -156,6 +156,36 @@ class MigrationSafetyPluginTest {
         assertThat(result.getOutput()).contains("certified 1/2 migrations");
     }
 
+    @Test
+    void certifySuggestsMissingRollbacksAndTheyPassOnRerun() throws Exception {
+        io.migcheck.testing.PostgresSupport.reset();
+        write("settings.gradle", "rootProject.name = 'sample'");
+        write("build.gradle",
+                "plugins { id 'io.migcheck.migration-safety' }\n"
+                        + "migrationSafety {\n"
+                        + "  migrationDir = 'migrations'\n"
+                        + "  rollbackDir = 'rollback'\n"
+                        + "  jdbcUrl = '" + io.migcheck.testing.PostgresSupport.jdbcUrl() + "'\n"
+                        + "  username = '" + io.migcheck.testing.PostgresSupport.username() + "'\n"
+                        + "  password = '" + io.migcheck.testing.PostgresSupport.password() + "'\n"
+                        + "}\n");
+        write("gradle.properties", "org.gradle.jvmargs=-Xmx512m");
+        write("migrations/V1__init.sql",
+                "CREATE TABLE account (id BIGINT PRIMARY KEY, balance INT NOT NULL)");
+        write("migrations/V2__add_note.sql", "ALTER TABLE account ADD COLUMN note VARCHAR(50)");
+
+        BuildResult first = runner("migrationSafetyCertify", "--suggest-missing").build();
+        assertThat(first.getOutput()).contains("generated rollback for V1");
+        assertThat(first.getOutput()).contains("generated rollback for V2");
+        assertThat(new File(projectDir, "rollback/U1__undo_init.sql")).exists();
+        assertThat(new File(projectDir, "rollback/U2__undo_add_note.sql")).exists();
+        assertThat(new File(projectDir, "rollback/R2__restore_add_note.sql")).exists();
+
+        BuildResult second = runner("migrationSafetyCertify").build();
+        assertThat(second.getOutput())
+                .contains("certified 2/2 migrations: 0 data loss, 0 uncovered");
+    }
+
     private void setUpProject() throws Exception {
         write("settings.gradle", "rootProject.name = 'sample'");
         write("build.gradle",

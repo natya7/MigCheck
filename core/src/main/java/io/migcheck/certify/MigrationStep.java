@@ -2,5 +2,6 @@ package io.migcheck.certify;
 
 import java.nio.file.Path;
 
-public record MigrationStep(String version, String description, Path rollbackScript) {
+public record MigrationStep(String version, String description, Path migrationFile,
+                            Path rollbackScript, Path restoreScript) {
 }
